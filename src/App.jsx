@@ -26,7 +26,7 @@ function App() {
       }}>
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           <Card title="Entity Configuration" style={{ marginBottom: 'var(--space-4)' }}>
-            <p style={{ marginBottom: 'var(--space-3)', color: '#555' }}>
+            <p style={{ marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
               Define the properties for your user entity. Ensure all fields are correctly typed.
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
@@ -56,10 +56,10 @@ function App() {
                justifyContent: 'center', 
                border: '2px dashed var(--color-border)', 
                borderRadius: 'var(--radius-sm)',
-               backgroundColor: '#fafafa',
+               backgroundColor: 'var(--color-surface-secondary)',
                margin: 'var(--space-1) 0'
              }}>
-                <span style={{ color: '#888' }}>Visual preview will appear here</span>
+                <span style={{ color: 'var(--color-text-tertiary)' }}>Visual preview will appear here</span>
              </div>
           </Card>
         </div>
@@ -73,25 +73,25 @@ function App() {
         overflowY: 'auto'
       }}>
         <div style={{ marginBottom: 'var(--space-4)' }}>
-          <h4 style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#666', marginBottom: 'var(--space-2)' }}>
+          <h4 style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>
             Step Explanation
           </h4>
-          <p style={{ fontSize: '14px', color: '#444' }}>
+          <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
             In this step, you are defining the schema for your database. The system will automatically generate migrations based on this config.
           </p>
         </div>
 
         <div style={{ marginBottom: 'var(--space-4)' }}>
-           <h4 style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#666', marginBottom: 'var(--space-2)' }}>
+           <h4 style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>
             AI Assistant
           </h4>
           <div style={{ 
-            backgroundColor: '#f9f9f9', 
+            backgroundColor: 'var(--color-surface-secondary)', 
             padding: 'var(--space-2)', 
             borderRadius: 'var(--radius-md)', 
             fontSize: '13px', 
-            color: '#333',
-            border: '1px solid #eee',
+            color: 'var(--color-text-primary)',
+            border: '1px solid var(--color-border)',
             marginBottom: 'var(--space-2)'
           }}>
             Try adding a field called "isActive" directly to the schema if you need soft deletes.

@@ -18,14 +18,14 @@ const TopBar = ({ projectName = "KodNest Premium", step = 1, totalSteps = 5, sta
       height: '64px'
     }}>
       <div style={{ fontWeight: 600, fontSize: '14px' }}>{projectName}</div>
-      <div style={{ fontSize: '14px', color: '#666' }}>Step {step} / {totalSteps}</div>
+      <div style={{ fontSize: '14px', color: 'var(--color-text-tertiary)' }}>Step {step} / {totalSteps}</div>
       <div style={{
         fontSize: '12px',
         fontWeight: 600,
         padding: '4px 8px',
         borderRadius: 'var(--radius-sm)',
-        backgroundColor: '#eee',
-        color: statusColors[status] || 'black'
+        backgroundColor: 'var(--color-border)',
+        color: statusColors[status] || 'var(--color-text-primary)'
       }}>
         {status}
       </div>

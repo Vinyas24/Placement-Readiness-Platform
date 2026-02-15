@@ -3,13 +3,20 @@
   --color-background: #F7F6F3;
   --color-text-primary: #111111;
   --color-accent: #8B0000;
-  --color-success: #4B7F52; /* Muted Green */
-  --color-warning: #D97706; /* Muted Amber */
+  --color-success: #4B7F52;
+  /* Muted Green */
+  --color-warning: #D97706;
+  /* Muted Amber */
   --color-border: #E5E5E5;
   --color-surface: #FFFFFF;
+  --color-surface-secondary: #FAFAFA;
+  --color-text-secondary: #555555;
+  --color-text-tertiary: #888888;
+  --color-border-hover: #999999;
 
   /* Typography */
-  --font-heading: 'Georgia', serif; /* Fallback for a nice serif */
+  --font-heading: 'Georgia', serif;
+  /* Fallback for a nice serif */
   --font-body: 'Inter', system-ui, -apple-system, sans-serif;
 
   /* Spacing System */

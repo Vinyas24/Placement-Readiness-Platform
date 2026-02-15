@@ -30,8 +30,8 @@
 }
 
 .btn-primary:hover {
-  background-color: #6e0000; /* Darker Red */
-  border-color: #6e0000;
+  background-color: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
 }
 
 /* Secondary Variant */
@@ -43,5 +43,5 @@
 
 .btn-secondary:hover {
   border-color: #999999;
-  background-color: rgba(0,0,0,0.02);
+  background-color: rgba(0, 0, 0, 0.02);
 }
