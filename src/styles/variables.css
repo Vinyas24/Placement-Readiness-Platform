@@ -1,0 +1,29 @@
+:root {
+  /* Color System */
+  --color-background: #F7F6F3;
+  --color-text-primary: #111111;
+  --color-accent: #8B0000;
+  --color-success: #4B7F52; /* Muted Green */
+  --color-warning: #D97706; /* Muted Amber */
+  --color-border: #E5E5E5;
+  --color-surface: #FFFFFF;
+
+  /* Typography */
+  --font-heading: 'Georgia', serif; /* Fallback for a nice serif */
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Spacing System */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 40px;
+  --space-5: 64px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease-in-out;
+  --transition-normal: 200ms ease-in-out;
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+}
