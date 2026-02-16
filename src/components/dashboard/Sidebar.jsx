@@ -7,6 +7,7 @@ const Sidebar = () => {
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/dashboard/practice', label: 'Practice', icon: Code },
     { path: '/dashboard/assessments', label: 'Assessments', icon: FileText },
+    { path: '/dashboard/history', label: 'History', icon: BookOpen },
     { path: '/dashboard/resources', label: 'Resources', icon: BookOpen },
     { path: '/dashboard/profile', label: 'Profile', icon: User }
   ];

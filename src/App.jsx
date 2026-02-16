@@ -7,6 +7,8 @@ import Practice from './pages/dashboard/Practice';
 import Assessments from './pages/dashboard/Assessments';
 import Resources from './pages/dashboard/Resources';
 import Profile from './pages/dashboard/Profile';
+import Results from './pages/dashboard/Results';
+import History from './pages/dashboard/History';
 
 function App() {
   return (
@@ -15,6 +17,8 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<Dashboard />} />
+          <Route path="results" element={<Results />} />
+          <Route path="history" element={<History />} />
           <Route path="practice" element={<Practice />} />
           <Route path="assessments" element={<Assessments />} />
           <Route path="resources" element={<Resources />} />
