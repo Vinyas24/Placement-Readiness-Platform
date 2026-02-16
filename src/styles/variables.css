@@ -2,7 +2,8 @@
   /* Color System */
   --color-background: #F7F6F3;
   --color-text-primary: #111111;
-  --color-accent: #8B0000;
+  --color-accent: hsl(245, 58%, 51%);
+  --color-accent-hover: hsl(245, 58%, 45%);
   --color-success: #4B7F52;
   /* Muted Green */
   --color-warning: #D97706;
