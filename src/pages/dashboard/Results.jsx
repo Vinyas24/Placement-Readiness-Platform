@@ -4,7 +4,7 @@ import { getAnalysisById, getHistory, updateAnalysis } from '../../utils/storage
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { ArrowLeft, CheckCircle, Circle, Download, Copy, PlayCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Circle, Download, Copy, PlayCircle, Building, Info, MapPin } from 'lucide-react';
 
 const Results = () => {
   const [analysis, setAnalysis] = useState(null);
@@ -29,7 +29,6 @@ const Results = () => {
 
     if (data) {
       setAnalysis(data);
-      // Initialize confidence map if it exists, else default empty (all "practice")
       setSkillConfidence(data.skillConfidenceMap || {});
       setCurrentScore(data.currentScore || data.readinessScore);
     }
@@ -41,38 +40,23 @@ const Results = () => {
 
     const newConfidence = { ...skillConfidence };
     if (newConfidence[skill] === 'know') {
-      delete newConfidence[skill]; // Default is practice
+      delete newConfidence[skill];
     } else {
       newConfidence[skill] = 'know';
     }
 
     setSkillConfidence(newConfidence);
 
-    // Recalculate Score
-    // Base Score + (2 * Known) - (2 * Practice-Implied)
-    // Actually, simpler logic: Start with base. 
-    // If "Know" -> +2. If "Practice" (default) -> -1 from base? 
-    // Requirement said: "+2 for know, -2 for practice".
-    // Let's assume the "Base Score" calculated initially was a static snapshot.
-    // To make it dynamic, let's recalculate from the BASE logic + modifiers.
-    // OR simpler: Take the original readinessScore as the "neutral" starting point 
-    // (assuming it didn't account for user confidence yet).
-    // Let's stick to the prompt: "Start from base readinessScore... +2 for know, -2 for practice".
-    
-    // We need to count how many skills are tracked.
     const allSkills = Object.values(analysis.extractedSkills).flat();
     const totalSkills = allSkills.length;
     
     const knownCount = Object.values(newConfidence).filter(v => v === 'know').length;
-    const practiceCount = totalSkills - knownCount; // All non-known are practice
+    const practiceCount = totalSkills - knownCount;
 
     let newScore = analysis.readinessScore + (2 * knownCount) - (2 * practiceCount);
-    
-    // Bounds 0-100
     newScore = Math.max(0, Math.min(100, newScore));
     setCurrentScore(newScore);
 
-    // Persist
     updateAnalysis(analysis.id, {
       skillConfidenceMap: newConfidence,
       currentScore: newScore
@@ -93,6 +77,23 @@ const Results = () => {
     content += `Role: ${analysis.role}\nCompany: ${analysis.company}\n`;
     content += `Readiness Score: ${currentScore}/100\n\n`;
     
+    if (analysis.companyIntel) {
+      content += `--- COMPANY INTEL ---\n`;
+      content += `Industry: ${analysis.companyIntel.industry}\n`;
+      content += `Size: ${analysis.companyIntel.size}\n`;
+      content += `Focus: ${analysis.companyIntel.focus}\n\n`;
+    }
+
+    content += `--- ROUND MAPPING ---\n`;
+    if (analysis.roundMapping) {
+      analysis.roundMapping.forEach(r => {
+        content += `${r.round}: ${r.name} (${r.type})\n`;
+        content += `  Desc: ${r.description}\n`;
+        content += `  Why: ${r.whyItMatters}\n`;
+      });
+      content += '\n';
+    }
+
     content += `--- SKILLS ---\n`;
     Object.entries(analysis.extractedSkills).forEach(([cat, skills]) => {
       content += `${cat}: ${skills.join(', ')}\n`;
@@ -102,12 +103,6 @@ const Results = () => {
     analysis.plan.forEach(p => {
       content += `${p.day} (${p.focus}):\n`;
       p.tasks.forEach(t => content += `  - ${t}\n`);
-    });
-
-    content += `\n--- CHECKLIST ---\n`;
-    Object.entries(analysis.checklist).forEach(([r, items]) => {
-      content += `${r}:\n`;
-      items.forEach(i => content += `  [ ] ${i}\n`);
     });
 
     content += `\n--- QUESTIONS ---\n`;
@@ -123,7 +118,6 @@ const Results = () => {
     document.body.removeChild(a);
   };
 
-  // Get Top Weak Skills
   const weakSkills = useMemo(() => {
     if (!analysis) return [];
     const allSkills = Object.values(analysis.extractedSkills).flat();
@@ -131,7 +125,7 @@ const Results = () => {
   }, [analysis, skillConfidence]);
 
   if (!analysis) {
-    return <div style={{ padding: '20px' }}>Loading...</div>; // Or handling from previous step
+    return <div style={{ padding: '20px' }}>Loading...</div>;
   }
 
   const chartData = [
@@ -161,87 +155,183 @@ const Results = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
         
-        {/* Live Score */}
-        <Card>
-          <h3 style={{ marginBottom: 'var(--space-3)' }}>Live Readiness</h3>
-          <div style={{ height: '200px', position: 'relative' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  startAngle={180}
-                  endAngle={0}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{
-              position: 'absolute',
-              top: '60%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              textAlign: 'center'
-            }}>
-              <span style={{ fontSize: '32px', fontWeight: 'bold', display: 'block' }}>{currentScore}%</span>
+        {/* Left Column: Score & Company Intel */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          {/* Live Score */}
+          <Card>
+            <h3 style={{ marginBottom: 'var(--space-3)' }}>Live Readiness</h3>
+            <div style={{ height: '200px', position: 'relative' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    startAngle={180}
+                    endAngle={0}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div style={{
+                position: 'absolute',
+                top: '60%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                textAlign: 'center'
+              }}>
+                <span style={{ fontSize: '32px', fontWeight: 'bold', display: 'block' }}>{currentScore}%</span>
+              </div>
             </div>
-          </div>
-          <p style={{ fontSize: '12px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-            Adjusts as you mark skills "Known".
-          </p>
-        </Card>
+            <p style={{ fontSize: '12px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+              Adjusts as you mark skills "Known".
+            </p>
+          </Card>
 
-        {/* Interactive Skills */}
-        <Card>
-          <h3 style={{ marginBottom: 'var(--space-3)' }}>Skill Assessment</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            {Object.entries(analysis.extractedSkills).map(([category, skills]) => (
-              skills.length > 0 && (
-                <div key={category}>
-                  <strong style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-tertiary)' }}>
-                    {category}
-                  </strong>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
-                    {skills.map(skill => {
-                      const isKnown = skillConfidence[skill] === 'know';
-                      return (
-                        <button 
-                          key={skill}
-                          onClick={() => toggleSkill(skill)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            backgroundColor: isKnown ? 'rgba(75, 127, 82, 0.1)' : 'rgba(0,0,0,0.03)',
-                            color: isKnown ? 'var(--color-success)' : 'var(--color-text-secondary)',
-                            border: `1px solid ${isKnown ? 'var(--color-success)' : 'var(--color-border)'}`,
-                            padding: '6px 12px',
-                            borderRadius: '20px',
-                            fontSize: '14px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                          }}
-                        >
-                          {isKnown ? <CheckCircle size={14} /> : <Circle size={14} />}
-                          {skill}
-                        </button>
-                      );
-                    })}
-                  </div>
+          {/* Company Intel */}
+          {analysis.companyIntel && (
+            <Card>
+              <h3 style={{ marginBottom: 'var(--space-2)' }}>Company Intel</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--color-text-secondary)', fontSize: '14px' }}>
+                <Building size={16} /> 
+                <span style={{ fontWeight: 600 }}>{analysis.companyIntel.name}</span>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '8px', borderRadius: '4px' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', textTransform: 'uppercase' }}>Industry</div>
+                  <div style={{ fontSize: '13px', fontWeight: 500 }}>{analysis.companyIntel.industry}</div>
                 </div>
-              )
-            ))}
-             {Object.keys(analysis.extractedSkills).length === 0 && <p>No specific technical skills detected.</p>}
-          </div>
-        </Card>
+                <div style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '8px', borderRadius: '4px' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', textTransform: 'uppercase' }}>Size Type</div>
+                  <div style={{ fontSize: '13px', fontWeight: 500 }}>{analysis.companyIntel.size}</div>
+                </div>
+              </div>
+
+              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                <strong style={{ color: 'var(--color-text-primary)' }}>Focus:</strong> {analysis.companyIntel.focus}
+              </div>
+
+              {analysis.companyIntel.isDemo && (
+                <div style={{ marginTop: '12px', fontSize: '11px', color: '#9CA3AF', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Info size={12} /> Heuristic-based demo logic.
+                </div>
+              )}
+            </Card>
+          )}
+        </div>
+
+        {/* Right Column: Skills & Round Timeline */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+           
+           {/* Interactive Skills */}
+           <Card>
+            <h3 style={{ marginBottom: 'var(--space-3)' }}>Skill Assessment</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              {Object.entries(analysis.extractedSkills).map(([category, skills]) => (
+                skills.length > 0 && (
+                  <div key={category}>
+                    <strong style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-tertiary)' }}>
+                      {category}
+                    </strong>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+                      {skills.map(skill => {
+                        const isKnown = skillConfidence[skill] === 'know';
+                        return (
+                          <button 
+                            key={skill}
+                            onClick={() => toggleSkill(skill)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              backgroundColor: isKnown ? 'rgba(75, 127, 82, 0.1)' : 'rgba(0,0,0,0.03)',
+                              color: isKnown ? 'var(--color-success)' : 'var(--color-text-secondary)',
+                              border: `1px solid ${isKnown ? 'var(--color-success)' : 'var(--color-border)'}`,
+                              padding: '6px 12px',
+                              borderRadius: '20px',
+                              fontSize: '14px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                            }}
+                          >
+                            {isKnown ? <CheckCircle size={14} /> : <Circle size={14} />}
+                            {skill}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )
+              ))}
+               {Object.keys(analysis.extractedSkills).length === 0 && <p>No specific technical skills detected.</p>}
+            </div>
+          </Card>
+
+          {/* Round Mapping Timeline */}
+          {analysis.roundMapping && (
+            <Card>
+              <h3 style={{ marginBottom: 'var(--space-3)' }}>Hiring Process Roadmap</h3>
+              <div style={{ position: 'relative', paddingLeft: '16px' }}>
+                {/* Vertical Line */}
+                <div style={{ 
+                  position: 'absolute', 
+                  left: '23px', 
+                  top: '10px', 
+                  bottom: '30px', 
+                  width: '2px', 
+                  backgroundColor: 'var(--color-border)' 
+                }} />
+
+                {analysis.roundMapping.map((round, index) => (
+                  <div key={index} style={{ marginBottom: '24px', position: 'relative', paddingLeft: '24px' }}>
+                    {/* Dot */}
+                    <div style={{ 
+                      position: 'absolute', 
+                      left: '0', 
+                      top: '0', 
+                      width: '16px', 
+                      height: '16px', 
+                      borderRadius: '50%', 
+                      backgroundColor: 'var(--color-surface)', 
+                      border: '2px solid var(--color-accent)',
+                      zIndex: 1
+                    }} />
+                    
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '16px', color: 'var(--color-text-primary)' }}>
+                      {round.round}: {round.name}
+                    </h4>
+                    <span style={{ 
+                      fontSize: '12px', 
+                      backgroundColor: 'rgba(99, 102, 241, 0.1)', 
+                      color: 'var(--color-accent)', 
+                      padding: '2px 8px', 
+                      borderRadius: '4px',
+                      marginBottom: '8px',
+                      display: 'inline-block'
+                    }}>
+                      {round.type}
+                    </span>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                      {round.description}
+                    </p>
+                    <div style={{ fontSize: '13px', color: 'var(--color-text-tertiary)', fontStyle: 'italic', borderLeft: '2px solid #e5e5e5', paddingLeft: '8px' }}>
+                      💡 {round.whyItMatters}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+        </div>
       </div>
 
       {/* Action Next Box */}

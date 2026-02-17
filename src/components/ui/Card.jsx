@@ -1,14 +1,17 @@
 import React from 'react';
 
-const Card = ({ children, title, padding = 'var(--space-3)', style = {} }) => {
+const Card = ({ children, title, padding = 'var(--space-3)', style = {}, ...props }) => {
   return (
-    <div style={{
-      backgroundColor: 'var(--color-surface)',
-      border: '1px solid var(--color-border)',
-      borderRadius: 'var(--radius-md)',
-      padding: padding,
-      ...style
-    }}>
+    <div 
+      {...props}
+      style={{
+        backgroundColor: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-md)',
+        padding: padding,
+        ...style
+      }}
+    >
       {title && (
         <h3 style={{
            marginTop: 0,

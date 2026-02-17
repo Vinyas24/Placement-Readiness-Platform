@@ -13,6 +13,146 @@ const SKILL_CATEGORIES = {
 };
 
 /**
+ * Heuristic Database for Company Intel
+ */
+const ENTERPRISE_COMPANIES = [
+  'google', 'microsoft', 'amazon', 'apple', 'meta', 'facebook', 'netflix', 
+  'tcs', 'infosys', 'wipro', 'accenture', 'cognizant', 'ibm', 'oracle', 'sap', 
+  'deloitte', 'capgemini', 'hcl', 'tech mahindra', 'mindtree', 'adobe', 'salesforce',
+  'uber', 'flipkart', 'walmart', 'jpmorgan', 'goldman sachs', 'morgan stanley'
+];
+
+const MID_SIZE_COMPANIES = [
+  'swiggy', 'zomato', 'razorpay', 'cred', 'dream11', 'paytm', 'phonepe', 
+  'ola', 'urban company', 'nykaa', 'zerodha', 'groww', 'lenskart', 'meesha',
+  'browserstack', 'postman'
+];
+
+/**
+ * Get Company Intel based on heuristics
+ */
+const getCompanyIntel = (companyName) => {
+  if (!companyName) {
+    return {
+      name: 'Unknown Company',
+      industry: 'Technology',
+      size: 'Startup',
+      focus: 'Product development & Agility',
+      isHeuristic: true
+    };
+  }
+
+  const lowerName = companyName.toLowerCase().trim();
+  let size = 'Startup'; // Default
+  let focus = 'Rapid feature development, Full-stack breadth, Problem solving';
+
+  if (ENTERPRISE_COMPANIES.some(c => lowerName.includes(c))) {
+    size = 'Enterprise';
+    focus = 'Scalability, Distributed Systems, Process adherence, Core CS Fundamentals';
+  } else if (MID_SIZE_COMPANIES.some(c => lowerName.includes(c))) {
+    size = 'Mid-size';
+    focus = 'Product scaling, System Design, Code quality, Ownership';
+  }
+
+  // Infer industry slightly
+  let industry = 'Technology Services'; // Default
+  if (['jpmorgan', 'goldman', 'morgan', 'bank', 'finance'].some(k => lowerName.includes(k))) industry = 'FinTech / Banking';
+  else if (['swiggy', 'zomato', 'uber', 'ola'].some(k => lowerName.includes(k))) industry = 'Consumer Tech';
+  else if (['amazon', 'flipkart', 'walmart', 'meesho'].some(k => lowerName.includes(k))) industry = 'E-commerce';
+
+  return {
+    name: companyName,
+    industry,
+    size,
+    focus,
+    isDemo: true
+  };
+};
+
+/**
+ * Generate Dynamic Round Mapping based on Intel & Skills
+ */
+const generateRoundMapping = (intel, extractedSkills) => {
+  const rounds = [];
+  const hasWeb = extractedSkills['Web']?.length > 0;
+  const hasDSA = extractedSkills['Core CS']?.length > 0;
+
+  // Round 1
+  if (intel.size === 'Enterprise') {
+    rounds.push({
+      round: 'Round 1',
+      name: 'Online Assessment',
+      type: 'Aptitude & DSA',
+      description: '60-90 min test with 2-3 coding problems (Arrays/Trees/DP) + Aptitude section.',
+      whyItMatters: 'Filters thousands of applicants. Speed and accuracy are key.'
+    });
+  } else {
+    rounds.push({
+      round: 'Round 1',
+      name: 'Take-home / Screening',
+      type: 'Practical / Machine Coding',
+      description: hasWeb 
+        ? 'Build a small feature (e.g., Todo list with API integration) or fix bugs in existing code.'
+        : 'Solve 1-2 practical coding problems on HackerRank/LeetCode.',
+      whyItMatters: 'Tests ability to write clean, working code in a realistic setup.'
+    });
+  }
+
+  // Round 2
+  if (intel.size === 'Enterprise') {
+    rounds.push({
+      round: 'Round 2',
+      name: 'Technical Interview I',
+      type: 'DSA & Algorithms',
+      description: '1:1 coding on whiteboard/doc. Focus on optimizing Time/Space complexity.',
+      whyItMatters: 'Core competency check. Can you think clearly under pressure?'
+    });
+  } else {
+    rounds.push({
+      round: 'Round 2',
+      name: 'Technical Deep Dive',
+      type: 'Stack & System Basics',
+      description: hasWeb
+        ? 'React/Node internals, State management patterns, API design discussion.'
+        : 'Language internals (Java memory / Python GIL), DB schema design.',
+      whyItMatters: 'Validates depth of knowledge in your primary tech stack.'
+    });
+  }
+
+  // Round 3
+  if (intel.size === 'Startup') {
+    rounds.push({
+      round: 'Round 3',
+      name: 'Founder / Culture Fit',
+      type: 'Behavioral & Vision',
+      description: 'Discussion with CTO/Founder. Product sense, ownership examples, career alignment.',
+      whyItMatters: 'Startups need self-starters who align with the mission.'
+    });
+  } else {
+    rounds.push({
+      round: 'Round 3',
+      name: 'Technical Interview II',
+      type: 'System Design / Advanced',
+      description: intel.size === 'Enterprise' 
+        ? 'LLD (Low Level Design) for Freshers or HLD for experienced. DB choices, API contracts.'
+        : 'Project architecture discussion. "How would you scale X?"',
+      whyItMatters: 'Tests ability to build maintainable and scalable systems.'
+    });
+    
+    // Enterprise usually has a dedicated HR round as R4
+    rounds.push({
+      round: 'Round 4',
+      name: 'Managerial / HR',
+      type: 'Behavioral',
+      description: 'Situation-based questions (STAR method). Team fit, willingness to learn.',
+      whyItMatters: 'Ensures cultural alignment and soft skills.'
+    });
+  }
+
+  return rounds;
+};
+
+/**
  * Extract skills from JD text using simple keyword matching
  */
 const extractSkills = (text) => {
@@ -23,16 +163,10 @@ const extractSkills = (text) => {
   
   Object.entries(SKILL_CATEGORIES).forEach(([category, keywords]) => {
     const found = keywords.filter(keyword => {
-      // Use word boundary regex to avoid partial matches (e.g. "Go" in "Good")
-      // Escape special chars like C++
       const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      // For C++ and C#, we want to match exact word-like tokens, but \b fails on +.
-      // So we handle them separately or just use includes for simplicity on specific tokens if regex is tricky.
-      
       let regex;
       if (keyword === 'C++' || keyword === 'C#') {
-         // Special handling: check if it exists surrounded by non-word chars or start/end
-         // This is a rough heuristic.
+         // Heuristic for these special chars
          return lowerText.includes(keyword.toLowerCase());
       } else {
          regex = new RegExp(`\\b${escapedKeyword}\\b`, 'i');
@@ -45,8 +179,6 @@ const extractSkills = (text) => {
     }
   });
 
-  // If no skills found, simple fallback could be handled by caller or here. 
-  // Let's return empty and handle "General" logic in main function or UI.
   return extracted;
 };
 
@@ -81,15 +213,6 @@ const generatePlan = (extractedSkills) => {
   const hasWeb = allSkills.some(s => ['React', 'Node.js', 'HTML', 'CSS', 'Vue', 'Angular'].includes(s));
   const hasData = allSkills.some(s => ['SQL', 'MongoDB', 'PostgreSQL'].includes(s));
   
-  // Base plan structure
-  const plan = {
-    Day1_2: "Basics + Core CS Context",
-    Day3_4: "DSA + Coding Practice",
-    Day5: "Project + Resume Alignment",
-    Day6: "Mock Interview Questions",
-    Day7: "Revision + Weak Areas"
-  };
-
   const detailedPlan = [];
   
   detailedPlan.push({
@@ -248,6 +371,8 @@ export const analyzeJobDescription = (text, company, role) => {
   const plan = generatePlan(extractedSkills);
   const checklist = generateChecklist(extractedSkills);
   const questions = generateQuestions(extractedSkills);
+  const companyIntel = getCompanyIntel(company);
+  const roundMapping = generateRoundMapping(companyIntel, extractedSkills);
   
   return {
     id: Date.now().toString(),
@@ -257,8 +382,10 @@ export const analyzeJobDescription = (text, company, role) => {
     jdText: text,
     extractedSkills,
     plan,
-    checklist,
+    checklist, // Retaining for legacy compatibility / export
     questions,
-    readinessScore: score
+    readinessScore: score,
+    companyIntel,
+    roundMapping
   };
 };
