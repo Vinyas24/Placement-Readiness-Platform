@@ -26,7 +26,11 @@ const TestChecklist = () => {
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      setCheckedItems(JSON.parse(saved));
+      try {
+        setCheckedItems(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to parse checklist state', e);
+      }
     }
   }, []);
 

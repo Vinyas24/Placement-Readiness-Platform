@@ -13,12 +13,16 @@ const Ship = () => {
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      const checkedItems = JSON.parse(saved);
-      // Hardcoded list length matching CHECKLIST_ITEMS in TestChecklist.jsx
-      // Ideally should be shared constant, but for this specific request simplicity:
-      const count = Object.values(checkedItems).filter(Boolean).length;
-      if (count >= 10) {
-        setLocked(false);
+      try {
+        const checkedItems = JSON.parse(saved);
+        // Hardcoded list length matching CHECKLIST_ITEMS in TestChecklist.jsx
+        // Ideally should be shared constant, but for this specific request simplicity:
+        const count = Object.values(checkedItems).filter(Boolean).length;
+        if (count >= 10) {
+          setLocked(false);
+        }
+      } catch (e) {
+         console.error('Failed to verify checklist for shipping', e);
       }
     }
   }, []);
