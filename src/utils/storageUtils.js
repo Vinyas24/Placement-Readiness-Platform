@@ -21,6 +21,26 @@ export const saveAnalysis = (analysis) => {
 };
 
 /**
+ * Update an existing analysis entry
+ */
+export const updateAnalysis = (id, updates) => {
+  try {
+    const history = getHistory();
+    const index = history.findIndex(item => item.id === id);
+    
+    if (index !== -1) {
+      history[index] = { ...history[index], ...updates };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+      return history[index];
+    }
+    return null;
+  } catch (error) {
+    console.error('Failed to update analysis:', error);
+    return null;
+  }
+};
+
+/**
  * Get all history items, sorted by newest first
  */
 export const getHistory = () => {

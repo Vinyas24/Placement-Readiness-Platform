@@ -1,86 +1,174 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { getAnalysisById, getHistory } from '../../utils/storageUtils';
+import { getAnalysisById, getHistory, updateAnalysis } from '../../utils/storageUtils';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { ArrowLeft, CheckCircle, Calendar, Briefcase, Building } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Circle, Download, Copy, PlayCircle } from 'lucide-react';
 
 const Results = () => {
   const [analysis, setAnalysis] = useState(null);
+  const [skillConfidence, setSkillConfidence] = useState({});
+  const [currentScore, setCurrentScore] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Load Initial Data
   useEffect(() => {
-    // 1. Try to get ID from navigation state
+    let data = null;
     const stateId = location.state?.analysisId;
-    
+
     if (stateId) {
-      const data = getAnalysisById(stateId);
-      if (data) {
-        setAnalysis(data);
-        return;
+      data = getAnalysisById(stateId);
+    } else {
+      const history = getHistory();
+      if (history.length > 0) {
+        data = history[0];
       }
     }
 
-    // 2. Fallback: Get latest from history
-    const history = getHistory();
-    if (history.length > 0) {
-      setAnalysis(history[0]);
-    } else {
-      // No history at all
-      setAnalysis(null);
+    if (data) {
+      setAnalysis(data);
+      // Initialize confidence map if it exists, else default empty (all "practice")
+      setSkillConfidence(data.skillConfidenceMap || {});
+      setCurrentScore(data.currentScore || data.readinessScore);
     }
   }, [location.state]);
 
+  // Handle Skill Toggle
+  const toggleSkill = (skill) => {
+    if (!analysis) return;
+
+    const newConfidence = { ...skillConfidence };
+    if (newConfidence[skill] === 'know') {
+      delete newConfidence[skill]; // Default is practice
+    } else {
+      newConfidence[skill] = 'know';
+    }
+
+    setSkillConfidence(newConfidence);
+
+    // Recalculate Score
+    // Base Score + (2 * Known) - (2 * Practice-Implied)
+    // Actually, simpler logic: Start with base. 
+    // If "Know" -> +2. If "Practice" (default) -> -1 from base? 
+    // Requirement said: "+2 for know, -2 for practice".
+    // Let's assume the "Base Score" calculated initially was a static snapshot.
+    // To make it dynamic, let's recalculate from the BASE logic + modifiers.
+    // OR simpler: Take the original readinessScore as the "neutral" starting point 
+    // (assuming it didn't account for user confidence yet).
+    // Let's stick to the prompt: "Start from base readinessScore... +2 for know, -2 for practice".
+    
+    // We need to count how many skills are tracked.
+    const allSkills = Object.values(analysis.extractedSkills).flat();
+    const totalSkills = allSkills.length;
+    
+    const knownCount = Object.values(newConfidence).filter(v => v === 'know').length;
+    const practiceCount = totalSkills - knownCount; // All non-known are practice
+
+    let newScore = analysis.readinessScore + (2 * knownCount) - (2 * practiceCount);
+    
+    // Bounds 0-100
+    newScore = Math.max(0, Math.min(100, newScore));
+    setCurrentScore(newScore);
+
+    // Persist
+    updateAnalysis(analysis.id, {
+      skillConfidenceMap: newConfidence,
+      currentScore: newScore
+    });
+  };
+
+  // Export Tools
+  const copyToClipboard = (text, label) => {
+    navigator.clipboard.writeText(text).then(() => {
+      alert(`${label} copied to clipboard!`);
+    });
+  };
+
+  const downloadTxt = () => {
+    if (!analysis) return;
+    const date = new Date(analysis.createdAt).toLocaleDateString();
+    let content = `PLACEMENT READINESS REPORT\nGenerated on: ${date}\n`;
+    content += `Role: ${analysis.role}\nCompany: ${analysis.company}\n`;
+    content += `Readiness Score: ${currentScore}/100\n\n`;
+    
+    content += `--- SKILLS ---\n`;
+    Object.entries(analysis.extractedSkills).forEach(([cat, skills]) => {
+      content += `${cat}: ${skills.join(', ')}\n`;
+    });
+
+    content += `\n--- 7-DAY PLAN ---\n`;
+    analysis.plan.forEach(p => {
+      content += `${p.day} (${p.focus}):\n`;
+      p.tasks.forEach(t => content += `  - ${t}\n`);
+    });
+
+    content += `\n--- CHECKLIST ---\n`;
+    Object.entries(analysis.checklist).forEach(([r, items]) => {
+      content += `${r}:\n`;
+      items.forEach(i => content += `  [ ] ${i}\n`);
+    });
+
+    content += `\n--- QUESTIONS ---\n`;
+    analysis.questions.forEach((q, i) => content += `${i+1}. ${q}\n`);
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `readiness_report_${analysis.company || 'general'}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  // Get Top Weak Skills
+  const weakSkills = useMemo(() => {
+    if (!analysis) return [];
+    const allSkills = Object.values(analysis.extractedSkills).flat();
+    return allSkills.filter(s => skillConfidence[s] !== 'know').slice(0, 3);
+  }, [analysis, skillConfidence]);
+
   if (!analysis) {
-    return (
-      <div style={{ textAlign: 'center', padding: 'var(--space-5)' }}>
-        <h2>No Analysis Found</h2>
-        <p>Go back to the dashboard to analyze a job description.</p>
-        <Button onClick={() => navigate('/dashboard')} style={{ marginTop: 'var(--space-3)' }}>
-          Back to Dashboard
-        </Button>
-      </div>
-    );
+    return <div style={{ padding: '20px' }}>Loading...</div>; // Or handling from previous step
   }
 
-  const { company, role, readinessScore, extractedSkills, checklist, plan, questions } = analysis;
-
-  // Chart Data
-  const data = [
-    { name: 'Readiness', value: readinessScore },
-    { name: 'Gap', value: 100 - readinessScore }
+  const chartData = [
+    { name: 'Readiness', value: currentScore },
+    { name: 'Gap', value: 100 - currentScore }
   ];
   const COLORS = ['var(--color-accent)', '#e0e0e0'];
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '1000px', margin: '0 auto', paddingBottom: '40px' }}>
       
-      {/* Header */}
-      <div style={{ marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-        <Button variant="secondary" onClick={() => navigate('/dashboard')}>
-           <ArrowLeft size={16} /> Back
-        </Button>
-        <div>
-          <h1 style={{ fontSize: '24px', margin: 0 }}>Analysis Results</h1>
-          <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-            {role} @ {company}
-          </p>
+      {/* Header & Export Toolbar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <Button variant="secondary" onClick={() => navigate('/dashboard/history')}>
+             <ArrowLeft size={16} /> Back
+          </Button>
+          <h1 style={{ fontSize: '24px', margin: 0 }}>Results: {analysis.role}</h1>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '8px' }}>
+           <Button variant="secondary" onClick={downloadTxt} title="Download Report">
+             <Download size={16} /> TXT
+           </Button>
         </div>
       </div>
 
-      {/* Top Section: Score & Skills */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
         
-        {/* Score Card */}
+        {/* Live Score */}
         <Card>
-          <h3 style={{ marginBottom: 'var(--space-3)' }}>Readiness Score</h3>
+          <h3 style={{ marginBottom: 'var(--space-3)' }}>Live Readiness</h3>
           <div style={{ height: '200px', position: 'relative' }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={data}
+                  data={chartData}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
@@ -90,11 +178,10 @@ const Results = () => {
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {data.map((entry, index) => (
+                  {chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
               </PieChart>
             </ResponsiveContainer>
             <div style={{
@@ -104,64 +191,93 @@ const Results = () => {
               transform: 'translate(-50%, -50%)',
               textAlign: 'center'
             }}>
-              <span style={{ fontSize: '32px', fontWeight: 'bold', display: 'block' }}>{readinessScore}%</span>
-              <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Ready</span>
+              <span style={{ fontSize: '32px', fontWeight: 'bold', display: 'block' }}>{currentScore}%</span>
             </div>
           </div>
+          <p style={{ fontSize: '12px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+            Adjusts as you mark skills "Known".
+          </p>
         </Card>
 
-        {/* Skills Card */}
+        {/* Interactive Skills */}
         <Card>
-          <h3 style={{ marginBottom: 'var(--space-3)' }}>Extracted Skills</h3>
+          <h3 style={{ marginBottom: 'var(--space-3)' }}>Skill Assessment</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            {Object.entries(extractedSkills).map(([category, skills]) => (
+            {Object.entries(analysis.extractedSkills).map(([category, skills]) => (
               skills.length > 0 && (
                 <div key={category}>
                   <strong style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-tertiary)' }}>
                     {category}
                   </strong>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
-                    {skills.map(skill => (
-                      <span key={skill} style={{
-                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                        color: 'var(--color-accent)',
-                        padding: '4px 12px',
-                        borderRadius: 'var(--radius-sm)',
-                        fontSize: '14px'
-                      }}>
-                        {skill}
-                      </span>
-                    ))}
+                    {skills.map(skill => {
+                      const isKnown = skillConfidence[skill] === 'know';
+                      return (
+                        <button 
+                          key={skill}
+                          onClick={() => toggleSkill(skill)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            backgroundColor: isKnown ? 'rgba(75, 127, 82, 0.1)' : 'rgba(0,0,0,0.03)',
+                            color: isKnown ? 'var(--color-success)' : 'var(--color-text-secondary)',
+                            border: `1px solid ${isKnown ? 'var(--color-success)' : 'var(--color-border)'}`,
+                            padding: '6px 12px',
+                            borderRadius: '20px',
+                            fontSize: '14px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          {isKnown ? <CheckCircle size={14} /> : <Circle size={14} />}
+                          {skill}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )
             ))}
-            {Object.keys(extractedSkills).length === 0 && <p>No specific technical skills detected.</p>}
+             {Object.keys(analysis.extractedSkills).length === 0 && <p>No specific technical skills detected.</p>}
           </div>
         </Card>
       </div>
 
-      {/* 4 Round Checklist */}
-      <h2 style={{ fontSize: '20px', marginBottom: 'var(--space-3)' }}>Interview Rounds Checklist</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-5)' }}>
-        {Object.entries(checklist).map(([round, items]) => (
-          <Card key={round}>
-            <h3 style={{ fontSize: '16px', marginBottom: 'var(--space-2)', color: 'var(--color-accent)' }}>{round}</h3>
-            <ul style={{ paddingLeft: '20px', margin: 0 }}>
-              {items.map((item, idx) => (
-                <li key={idx} style={{ marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </Card>
-        ))}
+      {/* Action Next Box */}
+      <div style={{ 
+        backgroundColor: '#f0f9ff', 
+        border: '1px solid #bae6fd', 
+        padding: 'var(--space-3)', 
+        borderRadius: 'var(--radius-md)',
+        marginBottom: 'var(--space-4)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-3)'
+      }}>
+        <div style={{ backgroundColor: '#0ea5e9', color: 'white', padding: '10px', borderRadius: '50%' }}>
+          <PlayCircle size={24} />
+        </div>
+        <div>
+          <h4 style={{ margin: '0 0 4px 0', color: '#0369a1' }}>Recommended Next Step</h4>
+          <p style={{ margin: 0, fontSize: '14px', color: '#0c4a6e' }}>
+            {weakSkills.length > 0 
+              ? `Prioritize learning ${weakSkills.join(', ')}. Start Day 1 of your plan now.`
+              : `You're well prepared! Start reviewing Mock Interview questions.`
+            }
+          </p>
+        </div>
       </div>
 
-      {/* 7 Day Plan */}
-      <h2 style={{ fontSize: '20px', marginBottom: 'var(--space-3)' }}>7-Day Preparation Plan</h2>
+       {/* Plan Section with Copy */}
+       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-5)', marginBottom: 'var(--space-3)' }}>
+        <h2 style={{ fontSize: '20px', margin: 0 }}>7-Day Preparation Plan</h2>
+        <Button variant="secondary" onClick={() => copyToClipboard(JSON.stringify(analysis.plan, null, 2), 'Plan')} style={{ fontSize: '12px', padding: '6px 12px' }}>
+          <Copy size={12} /> Copy Plan
+        </Button>
+      </div>
       <div style={{ marginBottom: 'var(--space-5)' }}>
-        {plan.map((dayPlan, index) => (
+        {analysis.plan.map((dayPlan, index) => (
           <div key={index} style={{
             backgroundColor: 'var(--color-surface)',
             border: '1px solid var(--color-border)',
@@ -182,18 +298,56 @@ const Results = () => {
         ))}
       </div>
 
-      {/* Interview Questions */}
-      <h2 style={{ fontSize: '20px', marginBottom: 'var(--space-3)' }}>Likely Interview Questions</h2>
+      {/* Questions with Copy */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+        <h2 style={{ fontSize: '20px', margin: 0 }}>Likely Interview Questions</h2>
+        <Button variant="secondary" onClick={() => copyToClipboard(analysis.questions.join('\n'), 'Questions')} style={{ fontSize: '12px', padding: '6px 12px' }}>
+          <Copy size={12} /> Copy Questions
+        </Button>
+      </div>
       <Card>
         <ul style={{ paddingLeft: '20px', margin: 0 }}>
-          {questions.map((q, idx) => (
+          {analysis.questions.map((q, idx) => (
             <li key={idx} style={{ marginBottom: '12px', fontSize: '15px' }}>
               {q}
             </li>
           ))}
         </ul>
       </Card>
-
+      
+      {/* Checklist with Copy */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)', marginTop: 'var(--space-5)' }}>
+        <h2 style={{ fontSize: '20px', margin: 0 }}>Round-wise Checklist</h2>
+        <Button 
+          variant="secondary" 
+          onClick={() => {
+            let text = '';
+            Object.entries(analysis.checklist).forEach(([r, items]) => {
+              text += `${r}:\n`;
+              items.forEach(i => text += `  [ ] ${i}\n`);
+              text += '\n';
+            });
+            copyToClipboard(text, 'Checklist');
+          }}
+          style={{ fontSize: '12px', padding: '6px 12px' }}
+        >
+          <Copy size={12} /> Copy Checklist
+        </Button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-5)' }}>
+        {Object.entries(analysis.checklist).map(([round, items]) => (
+          <Card key={round}>
+            <h3 style={{ fontSize: '16px', marginBottom: 'var(--space-2)', color: 'var(--color-accent)' }}>{round}</h3>
+            <ul style={{ paddingLeft: '20px', margin: 0 }}>
+              {items.map((item, idx) => (
+                <li key={idx} style={{ marginBottom: '8px', fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 };
