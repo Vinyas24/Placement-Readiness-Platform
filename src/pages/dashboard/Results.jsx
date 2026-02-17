@@ -30,7 +30,8 @@ const Results = () => {
     if (data) {
       setAnalysis(data);
       setSkillConfidence(data.skillConfidenceMap || {});
-      setCurrentScore(data.currentScore || data.readinessScore);
+      // Support new schema (finalScore) and legacy (currentScore/readinessScore)
+      setCurrentScore(data.finalScore ?? data.currentScore ?? data.readinessScore);
     }
   }, [location.state]);
 
@@ -47,19 +48,24 @@ const Results = () => {
 
     setSkillConfidence(newConfidence);
 
+    // Recalculate Score
+    // New Schema uses 'baseScore'. Legacy uses 'readinessScore'.
+    const base = analysis.baseScore ?? analysis.readinessScore;
+
     const allSkills = Object.values(analysis.extractedSkills).flat();
     const totalSkills = allSkills.length;
     
     const knownCount = Object.values(newConfidence).filter(v => v === 'know').length;
     const practiceCount = totalSkills - knownCount;
 
-    let newScore = analysis.readinessScore + (2 * knownCount) - (2 * practiceCount);
+    let newScore = base + (2 * knownCount) - (2 * practiceCount);
     newScore = Math.max(0, Math.min(100, newScore));
     setCurrentScore(newScore);
 
     updateAnalysis(analysis.id, {
       skillConfidenceMap: newConfidence,
-      currentScore: newScore
+      finalScore: newScore,
+      currentScore: newScore // Keep legacy sync
     });
   };
 

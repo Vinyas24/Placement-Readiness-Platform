@@ -1,80 +1,63 @@
-/**
- * Utility functions for storing analysis history
- * Key: 'kodnest_analysis_history'
- */
-
 const STORAGE_KEY = 'kodnest_analysis_history';
 
-/**
- * Save a new analysis result to localStorage
- */
-export const saveAnalysis = (analysis) => {
+export const saveAnalysis = (analysisData) => {
   try {
-    const existingHistory = getHistory();
-    const newHistory = [analysis, ...existingHistory];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory));
+    const history = getHistory();
+    history.unshift(analysisData);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
     return true;
   } catch (error) {
-    console.error('Failed to save analysis:', error);
+    console.error("Failed to save analysis:", error);
     return false;
   }
 };
 
-/**
- * Update an existing analysis entry
- */
+export const getHistory = () => {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    if (!data) return [];
+    
+    // Robust parsing
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed)) {
+      console.warn("History data is not an array, resetting.");
+      return [];
+    }
+    
+    // Filter out corrupted entries (missing ID or createdAt)
+    return parsed.filter(item => item && item.id && item.createdAt);
+  } catch (error) {
+    console.error("Failed to parse history:", error);
+    return [];
+  }
+};
+
+export const getAnalysisById = (id) => {
+  const history = getHistory();
+  return history.find(item => item.id === id);
+};
+
 export const updateAnalysis = (id, updates) => {
   try {
     const history = getHistory();
     const index = history.findIndex(item => item.id === id);
     
     if (index !== -1) {
-      history[index] = { ...history[index], ...updates };
+      history[index] = { 
+        ...history[index], 
+        ...updates, 
+        updatedAt: new Date().toISOString() 
+      };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
       return history[index];
     }
     return null;
   } catch (error) {
-    console.error('Failed to update analysis:', error);
-    return null;
+     console.error("Failed to update analysis:", error);
+     return null;
   }
 };
 
-/**
- * Get all history items, sorted by newest first
- */
-export const getHistory = () => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (error) {
-    console.error('Failed to retrieve history:', error);
-    return [];
-  }
-};
-
-/**
- * Get a specific analysis by ID
- */
-export const getAnalysisById = (id) => {
-  try {
-    const history = getHistory();
-    return history.find(item => item.id === id) || null;
-  } catch (error) {
-    console.error('Failed to retrieve specific analysis:', error);
-    return null;
-  }
-};
-
-/**
- * Clear all history
- */
 export const clearHistory = () => {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-    return true;
-  } catch (error) {
-    console.error('Failed to clear history:', error);
-    return false;
-  }
+  localStorage.removeItem(STORAGE_KEY);
 };

@@ -74,9 +74,8 @@ const getCompanyIntel = (companyName) => {
  */
 const generateRoundMapping = (intel, extractedSkills) => {
   const rounds = [];
-  const hasWeb = extractedSkills['Web']?.length > 0;
-  const hasDSA = extractedSkills['Core CS']?.length > 0;
-
+  const hasWeb = (extractedSkills['Web'] || []).length > 0;
+  
   // Round 1
   if (intel.size === 'Enterprise') {
     rounds.push({
@@ -156,10 +155,13 @@ const generateRoundMapping = (intel, extractedSkills) => {
  * Extract skills from JD text using simple keyword matching
  */
 const extractSkills = (text) => {
-  if (!text) return {};
+  if (!text) return {
+    'Core CS': [], 'Languages': [], 'Web': [], 'Data': [], 'Cloud/DevOps': [], 'Testing': [], 'Other': []
+  };
   
   const lowerText = text.toLowerCase();
   const extracted = {};
+  let totalFound = 0;
   
   Object.entries(SKILL_CATEGORIES).forEach(([category, keywords]) => {
     const found = keywords.filter(keyword => {
@@ -176,8 +178,17 @@ const extractSkills = (text) => {
     
     if (found.length > 0) {
       extracted[category] = found;
+      totalFound += found.length;
+    } else {
+      extracted[category] = [];
     }
   });
+
+  // Fallback for empty skills
+  extracted['Other'] = [];
+  if (totalFound === 0) {
+    extracted['Other'] = ['Communication', 'Problem Solving', 'Basic Coding', 'Projects'];
+  }
 
   return extracted;
 };
@@ -189,7 +200,8 @@ const calculateScore = (extractedSkills, company, role, text) => {
   let score = 35; // Base score
   
   // +5 per detected category (max 30)
-  const categoriesCount = Object.keys(extractedSkills).length;
+  // Filter out empty categories
+  const categoriesCount = Object.values(extractedSkills).filter(arr => arr.length > 0).length;
   score += Math.min(categoriesCount * 5, 30);
   
   // +10 if company name provided
@@ -367,7 +379,7 @@ const generateQuestions = (extractedSkills) => {
 // Main entry point logic wrapper
 export const analyzeJobDescription = (text, company, role) => {
   const extractedSkills = extractSkills(text);
-  const score = calculateScore(extractedSkills, company, role, text);
+  const baseScore = calculateScore(extractedSkills, company, role, text); // Calculated ONCE
   const plan = generatePlan(extractedSkills);
   const checklist = generateChecklist(extractedSkills);
   const questions = generateQuestions(extractedSkills);
@@ -377,14 +389,20 @@ export const analyzeJobDescription = (text, company, role) => {
   return {
     id: Date.now().toString(),
     createdAt: new Date().toISOString(),
-    company: company || "Unknown Company",
-    role: role || "Unknown Role",
-    jdText: text,
+    updatedAt: new Date().toISOString(),
+    company: company || "",
+    role: role || "",
+    jdText: text || "",
     extractedSkills,
     plan,
-    checklist, // Retaining for legacy compatibility / export
+    plan7Days: plan, // Alias for strict schema compliance
+    checklist,
     questions,
-    readinessScore: score,
+    baseScore, 
+    finalScore: baseScore, // Initially same
+    currentScore: baseScore, // Legacy alias for UI compatibility
+    readinessScore: baseScore, // Legacy alias for UI compatibility
+    skillConfidenceMap: {},
     companyIntel,
     roundMapping
   };

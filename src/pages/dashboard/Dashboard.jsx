@@ -6,7 +6,7 @@ import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Textarea from '../../components/ui/Textarea';
 import Card from '../../components/ui/Card';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { Sparkles, ArrowRight, AlertTriangle } from 'lucide-react';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -16,6 +16,7 @@ const Dashboard = () => {
     jdText: ''
   });
   const [errors, setErrors] = useState({});
+  const [warning, setWarning] = useState(null); // New warning state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleChange = (e) => {
@@ -24,29 +25,28 @@ const Dashboard = () => {
       ...prev,
       [name]: value
     }));
-    // Clear error when user types
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: null }));
+    // Clear error/warning when user types
+    if (name === 'jdText') {
+      if (errors.jdText) setErrors(prev => ({ ...prev, jdText: null }));
+      if (warning) setWarning(null);
     }
-  };
-
-  const validate = () => {
-    const newErrors = {};
-    if (!formData.jdText.trim()) {
-      newErrors.jdText = 'Job Description is required for analysis';
-    } else if (formData.jdText.length < 50) {
-      newErrors.jdText = 'Job Description is too short. Please provide more details.';
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
   };
 
   const handleAnalyze = async () => {
-    if (!validate()) return;
-    
+    // 1. Critical Validation
+    if (!formData.jdText.trim()) {
+      setErrors({ jdText: 'Job Description is required.' });
+      return;
+    }
+
+    // 2. Warning Check (< 200 chars)
+    if (formData.jdText.trim().length < 200 && !warning) {
+      setWarning('This JD is too short to analyze deeply. Paste full JD for better output. Click Analyze again to proceed anyway.');
+      return; // Stop once to show warning
+    }
+
     setIsAnalyzing(true);
     
-    // Simulate a small delay for "processing" feel
     setTimeout(() => {
       try {
         const result = analyzeJobDescription(
@@ -108,7 +108,27 @@ const Dashboard = () => {
           onChange={handleChange}
           error={errors.jdText}
           rows={15}
+          style={warning ? { borderColor: '#f59e0b' } : {}}
         />
+        
+        {/* Warning Message Box */}
+        {warning && (
+          <div style={{ 
+            marginTop: '8px', 
+            padding: '12px', 
+            backgroundColor: '#fffbeb', 
+            border: '1px solid #fcd34d', 
+            borderRadius: 'var(--radius-sm)',
+            color: '#b45309',
+            fontSize: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <AlertTriangle size={16} />
+            {warning}
+          </div>
+        )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-3)' }}>
           <Button 
